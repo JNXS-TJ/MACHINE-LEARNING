@@ -1,0 +1,116 @@
+# coding:utf-8
+# Created by Tao Jian in 4 11 2019.
+import numpy as np
+# naive Bayes classifier.
+class NBC():
+    def __init__(self, D, y, isDiscrete):
+        # D represent training set and y is the corresponding labels.
+        # isDiscrete represent the corresponding attribute is Discrete or not.
+        # And it is a list.
+        # self.rows denotes the numbers of trainint data.
+        # And self.cols denotes the numbers of attributes.
+        self.rows, self.cols = D.shape
+        self.D = D
+        self.y = y
+        self.isDiscrete = isDiscrete
+        self.condProb = {}
+        # Suppose the number of classes is n and the numer of attributes is m.
+        # And the number of values in the i-th attribute is Vi.
+        # The structure of conProb is as below:
+        # condProb = {c1:{attr1:{val1:prob1, val2:prob2,..., valV1:probV1}
+        #                 ,...,
+        # Maybe some attributes is constant:
+        #                 attri:{0:meanVal, 1:varVal}
+        #                 ,...,
+        #                 attrm:{val1:prob1, val2:prob2,..., valVm:probVm}}
+        #             ,...,
+        #             cn:{attr1:{val1:prob1, val2:prob2,..., valV1:probV1}
+        #                 ,...,
+        #                 attrm:{val1:prob1, val2:prob2,..., valVm:probVm}}}
+        
+        self.prioriClassProb = {}
+        return
+
+    def computeCondProb(self, D, y, isDiscrete):
+        # This function compute condition probability with Laplacian correction.
+        # And the result computed is saved in dictionary self.cond_prob.
+        # conProb = p(val_i | c)
+        # c represent the specific class and val_i represent the specific
+        # value of the i-th attribute.
+        labels = np.unique(y, return_counts=False)
+        for c in labels:
+            self.condProb[c] = {}
+            # Dc is the training set whose label is c.
+            Dc = D[y == c, :]
+            for j in range(self.cols):
+                # if the j-th attribute is discrete.
+                self.condProb[c][j] = {}
+                if isDiscrete[j]:
+                    vals, nums = np.unique(Dc[:, j], return_counts=True)
+                    for i in range(len(vals)):
+                        self.condProb[c][j][vals[i]] = (nums[i] + 1) / (Dc.shape[0] + len(nums))
+                # if the j-th attribute isn't discrete.
+                else:
+                    mean = np.mean(Dc[:, j])
+                    var = np.var(Dc[:, j])
+                    self.condProb[c][j][0] = mean
+                    self.condProb[c][j][1] = var
+        return
+    
+    def computeClassPrioriProb(self, y):
+        # This function compute class priori probability with Laplacian correction
+        # and the result computed is saved in dictionary self.prioriClassProb.
+        labels, nums = np.unique(y, return_counts=True)
+        length = len(labels)
+        for i in range(len(labels)):
+            c = labels[i]
+            num = nums[i]
+            self.prioriClassProb[c] = (num + 1) / (self.rows + length)
+        return
+
+    def GaussianFunction(self, mean, var, x):
+        return 1 / np.sqrt( 2 * np.pi * var ) * np.exp( -(x - mean)**2 / 2 / var )
+    
+    # Input a piece of data and return the predicted label for it.
+    def predict(self, x, isDiscrete):
+        labels = np.unique(self.y)
+        prob = []
+        for c in labels:
+            prod = self.prioriClassProb[c]
+            for j in range(self.cols):
+                if isDiscrete[j]:
+                    prod *= self.condProb[c][j][x[j]]
+                else:
+                    prod *= self.GaussianFunction(self.condProb[c][j][0],
+                                             self.condProb[c][j][1], x)
+            prob.append(prod)
+        return np.argmax(prob)
+
+
+
+X = [[0, 0, 0, 0, 0, 0, 0.697, 0.460],
+     [1, 0, 1, 0, 0, 0, 0.774, 0.376],
+     [1, 0, 0, 0, 0, 0, 0.634, 0.264],
+     [0, 0, 1, 0, 0, 0, 0.608, 0.318],
+     [2, 0, 0, 0, 0, 0, 0.556, 0.215],
+     [0, 1, 0, 0, 1, 1, 0.403, 0.237],
+     [1, 1, 0, 1, 1, 1, 0.481, 0.149],
+     [1, 1, 0, 0, 1, 0, 0.437, 0.211],
+     [1, 1, 1, 1, 1, 0, 0.666, 0.091],
+     [0, 2, 2, 0, 2, 1, 0.243, 0.267],
+     [2, 2, 2, 2, 2, 0, 0.245, 0.057],
+     [2, 0, 0, 2, 2, 1, 0.343, 0.099],
+     [0, 1, 0, 1, 0, 0, 0.639, 0.161],
+     [2, 1, 1, 1, 0, 0, 0.657, 0.198],
+     [1, 1, 0, 0, 1, 1, 0.360, 0.370],
+     [2, 0, 0, 2, 2, 0, 0.593, 0.042],
+     [0, 0, 1, 1, 1, 0, 0.719, 0.103]]
+y = [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+isDiscrete = [1, 1, 1, 1, 1, 1, 0, 0]
+X = np.array(X)
+y = np.array(y)
+NBclassifier = NBC(X, y, isDiscrete)
+NBclassifier.computeCondProb(NBclassifier.D, NBclassifier.y, NBclassifier.isDiscrete)
+NBclassifier.computeClassPrioriProb(y)
+
+print(NBclassifier.predict([0, 0, 0, 0, 0, 0, 0.697, 0.460], NBclassifier.isDiscrete))
